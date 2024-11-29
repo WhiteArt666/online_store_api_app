@@ -81,7 +81,7 @@ router.post('/', asyncHandler(async (req, res) => {
             fields.forEach((field, index) => {
                 if (req.files[field] && req.files[field].length > 0) {
                     const file = req.files[field][0];
-                    const imageUrl = `http://localhost:3000/image/products/${file.filename}`;
+                    const imageUrl = `${process.env.SERVER_URL}/image/products/${file.filename}`;
                     imageUrls.push({ image: index + 1, url: imageUrl });
                 }
             });
