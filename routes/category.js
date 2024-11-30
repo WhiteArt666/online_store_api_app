@@ -3,7 +3,8 @@ const router = express.Router();
 const Category = require('../model/category');
 const SubCategory = require('../model/subCategory');
 const Product = require('../model/product');
-const { uploadCategory } = require('../uploadFile');
+// const { uploadCategory } = require('../uploadFile');
+const { uploadCategory } = require('../cloudinaryConfig');
 const multer = require('multer');
 const asyncHandler = require('express-async-handler');
 
@@ -35,31 +36,34 @@ router.get('/:id', asyncHandler(async (req, res) => {
 router.post('/', asyncHandler(async (req, res) => {
     try {
         uploadCategory.single('img')(req, res, async function (err) {
-            if (err instanceof multer.MulterError) {
-                if (err.code === 'LIMIT_FILE_SIZE') {
-                    err.message = 'File size is too large. Maximum filesize is 5MB.';
-                }
-                console.log(`Add category: ${err}`);
-                return res.json({ success: false, message: err });
-            } else if (err) {
-                console.log(`Add category: ${err}`);
-                return res.json({ success: false, message: err });
+            if (err) {
+                console.log(`Add Category error: ${err.message}`);
+                return res.status(400).json({ success: false, message: err.message });
             }
+
             const { name } = req.body;
-            let imageUrl = 'no_url';
+            let imageUrl = null;
+            let publicId = null;
+            
+            // Xử lý upload ảnh nếu có file
             if (req.file) {
-                imageUrl = `${process.env.SERVER_URL}/image/category/${req.file.filename}`;
+                imageUrl = req.file.path; // Đường dẫn ảnh từ Cloudinary
+                publicId = req.file.filename; // Public ID để quản lý ảnh
             }
-            console.log('url ', req.file)
+            // console.log('url ', req.file)
 
             if (!name) {
+                if (publicId) {
+                    await cloudinary.uploader.destroy(publicId);
+                }
                 return res.status(400).json({ success: false, message: "Name is required." });
             }
 
             try {
                 const newCategory = new Category({
                     name: name,
-                    image: imageUrl
+                    image: imageUrl,
+                    publicId: publicId
                 });
                 await newCategory.save();
                 res.json({ success: true, message: "Category created successfully.", data: null });
@@ -81,22 +85,31 @@ router.put('/:id', asyncHandler(async (req, res) => {
     try {
         const categoryID = req.params.id;
         uploadCategory.single('img')(req, res, async function (err) {
-            if (err instanceof multer.MulterError) {
-                if (err.code === 'LIMIT_FILE_SIZE') {
-                    err.message = 'File size is too large. Maximum filesize is 5MB.';
-                }
-                console.log(`Update category: ${err.message}`);
-                return res.json({ success: false, message: err.message });
-            } else if (err) {
-                console.log(`Update category: ${err.message}`);
-                return res.json({ success: false, message: err.message });
+            if (err) {
+                console.log(`Update Category error: ${err.message}`);
+                return res.status(400).json({ success: false, message: err.message });
             }
 
             const { name } = req.body;
-            let image = req.body.image;
+            // Tìm poster hiện tại
+            const existingCategory = await Category.findById(categoryID);
+            if (!existingCategory) {
+                return res.status(404).json({ success: false, message: "Category not found." });
+            }
 
+            let image = req.body.image;
+            let newPublicId = existingCategory.publicId;
+
+            // Nếu có file mới upload, xóa ảnh cũ và upload ảnh mới
             if (req.file) {
-                image = `http://localhost:3000/image/category/${req.file.filename}`;
+                // Xóa ảnh cũ trên Cloudinary nếu tồn tại
+                if (existingCategory.publicId) {
+                    await cloudinary.uploader.destroy(existingCategory.publicId);
+                }
+
+                // Lưu thông tin ảnh mới
+                newImageUrl = req.file.path;
+                newPublicId = req.file.filename;
             }
 
             if (!name || !image) {

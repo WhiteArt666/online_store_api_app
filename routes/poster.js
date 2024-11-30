@@ -112,7 +112,7 @@ router.post('/', asyncHandler(async (req, res) => {
                 res.json({ 
                     success: true, 
                     message: "Poster created successfully.", 
-                    data: { posterName, imageUrl } 
+                    data: null 
                 });
             } catch (error) {
                 // Xóa ảnh trên Cloudinary nếu lưu database thất bại
@@ -130,45 +130,112 @@ router.post('/', asyncHandler(async (req, res) => {
 }));
 
 // Update a poster
+// router.put('/:id', asyncHandler(async (req, res) => {
+//     try {
+//         const categoryID = req.params.id;
+//         uploadPosters.single('img')(req, res, async function (err) {
+//             if (err instanceof multer.MulterError) {
+//                 if (err.code === 'LIMIT_FILE_SIZE') {
+//                     err.message = 'File size is too large. Maximum filesize is 5MB.';
+//                 }
+//                 console.log(`Update poster: ${err.message}`);
+//                 return res.json({ success: false, message: err.message });
+//             } else if (err) {
+//                 console.log(`Update poster: ${err.message}`);
+//                 return res.json({ success: false, message: err.message });
+//             }
+
+//             const { posterName } = req.body;
+//             let image = req.body.image;
+
+
+//             if (req.file) {
+//                 image = `${process.env.SERVER_URL}/image/poster/${req.file.filename}`;
+//             }
+
+//             if (!posterName || !image) {
+//                 return res.status(400).json({ success: false, message: "Name and image are required." });
+//             }
+
+//             try {
+//                 const updatedPoster = await Poster.findByIdAndUpdate(categoryID, { posterName: posterName, imageUrl: image }, { new: true });
+//                 if (!updatedPoster) {
+//                     return res.status(404).json({ success: false, message: "Poster not found." });
+//                 }
+//                 res.json({ success: true, message: "Poster updated successfully.", data: null });
+//             } catch (error) {
+//                 res.status(500).json({ success: false, message: error.message });
+//             }
+
+//         });
+
+//     } catch (err) {
+//         console.log(`Error updating poster: ${err.message}`);
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// }));
+
+// Update a poster
 router.put('/:id', asyncHandler(async (req, res) => {
     try {
-        const categoryID = req.params.id;
+        const posterId = req.params.id;
         uploadPosters.single('img')(req, res, async function (err) {
-            if (err instanceof multer.MulterError) {
-                if (err.code === 'LIMIT_FILE_SIZE') {
-                    err.message = 'File size is too large. Maximum filesize is 5MB.';
-                }
-                console.log(`Update poster: ${err.message}`);
-                return res.json({ success: false, message: err.message });
-            } else if (err) {
-                console.log(`Update poster: ${err.message}`);
-                return res.json({ success: false, message: err.message });
+            if (err) {
+                console.log(`Update poster error: ${err.message}`);
+                return res.status(400).json({ success: false, message: err.message });
             }
 
             const { posterName } = req.body;
-            let image = req.body.image;
 
-
-            if (req.file) {
-                image = `${process.env.SERVER_URL}/image/poster/${req.file.filename}`;
+            // Tìm poster hiện tại
+            const existingPoster = await Poster.findById(posterId);
+            if (!existingPoster) {
+                return res.status(404).json({ success: false, message: "Poster not found." });
             }
 
-            if (!posterName || !image) {
-                return res.status(400).json({ success: false, message: "Name and image are required." });
+            let newImageUrl = existingPoster.imageUrl;
+            let newPublicId = existingPoster.publicId;
+
+            // Nếu có file mới upload, xóa ảnh cũ và upload ảnh mới
+            if (req.file) {
+                // Xóa ảnh cũ trên Cloudinary nếu tồn tại
+                if (existingPoster.publicId) {
+                    await cloudinary.uploader.destroy(existingPoster.publicId);
+                }
+
+                // Lưu thông tin ảnh mới
+                newImageUrl = req.file.path;
+                newPublicId = req.file.filename;
+            }
+
+            if (!posterName) {
+                return res.status(400).json({ success: false, message: "Name is required." });
             }
 
             try {
-                const updatedPoster = await Poster.findByIdAndUpdate(categoryID, { posterName: posterName, imageUrl: image }, { new: true });
+                const updatedPoster = await Poster.findByIdAndUpdate(
+                    posterId, 
+                    { 
+                        posterName: posterName, 
+                        imageUrl: newImageUrl,
+                        publicId: newPublicId 
+                    }, 
+                    { new: true }
+                );
+
                 if (!updatedPoster) {
                     return res.status(404).json({ success: false, message: "Poster not found." });
                 }
-                res.json({ success: true, message: "Poster updated successfully.", data: null });
+
+                res.json({ 
+                    success: true, 
+                    message: "Poster updated successfully.", 
+                    data: null
+                });
             } catch (error) {
                 res.status(500).json({ success: false, message: error.message });
             }
-
         });
-
     } catch (err) {
         console.log(`Error updating poster: ${err.message}`);
         return res.status(500).json({ success: false, message: err.message });

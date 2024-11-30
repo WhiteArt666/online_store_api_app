@@ -21,14 +21,14 @@ const categoryStorage = new CloudinaryStorage({
   }
 });
 
-// Storage cho products
+// Storage for products
 const productStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 'products', // Thư mục lưu trữ trên Cloudinary
+    folder: 'products', // Folder to store images on Cloudinary
     allowed_formats: ['jpeg', 'png', 'jpg'],
     public_id: (req, file) => {
-      return `product_${Date.now()}_${file.originalname.split('.')[0]}`;
+      return `product_${Date.now()}_${file.originalname.toLowerCase()}`;
     }
   }
 });
@@ -40,7 +40,7 @@ const posterStorage = new CloudinaryStorage({
     folder: 'posters', // Thư mục lưu trữ trên Cloudinary
     allowed_formats: ['jpeg', 'png', 'jpg'],
     public_id: (req, file) => {
-      return `poster_${Date.now()}_${file.originalname.split('.')[0]}`;
+      return `poster_${Date.now()}_${file.originalname.toLowerCase()}`;
     }
   }
 });
