@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Poster = require('../model/poster');
-const { uploadPosters } = require('../uploadFile');
+// const { uploadPosters } = require('../uploadFile');
+const { uploadPosters } = require('../cloudinaryConfig');
 const multer = require('multer');
 const asyncHandler = require('express-async-handler');
 
@@ -30,43 +31,98 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 // Create a new poster
+// router.post('/', asyncHandler(async (req, res) => {
+//     try {
+//         uploadPosters.single('img')(req, res, async function (err) {
+//             if (err instanceof multer.MulterError) {
+//                 if (err.code === 'LIMIT_FILE_SIZE') {
+//                     err.message = 'File size is too large. Maximum filesize is 5MB.';
+//                 }
+//                 console.log(`Add poster: ${err}`);
+//                 return res.json({ success: false, message: err });
+//             } else if (err) {
+//                 console.log(`Add poster: ${err}`);
+//                 return res.json({ success: false, message: err });
+//             }
+//             const { posterName } = req.body;
+//             let imageUrl = 'no_url';
+//             if (req.file) {
+//                 imageUrl = `${process.env.SERVER_URL}/image/poster/${req.file.filename}`
+//             }
+
+//             if (!posterName) {
+//                 return res.status(400).json({ success: false, message: "Name is required." });
+//             }
+
+//             try {
+//                 const newPoster = new Poster({
+//                     posterName: posterName,
+//                     imageUrl: imageUrl
+//                 });
+//                 await newPoster.save();
+//                 res.json({ success: true, message: "Poster created successfully.", data: null });
+//             } catch (error) {
+//                 console.error("Error creating Poster:", error);
+//                 res.status(500).json({ success: false, message: error.message });
+//             }
+
+//         });
+
+//     } catch (err) {
+//         console.log(`Error creating Poster: ${err.message}`);
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// }));
+
+// Create a new poster
 router.post('/', asyncHandler(async (req, res) => {
     try {
         uploadPosters.single('img')(req, res, async function (err) {
-            if (err instanceof multer.MulterError) {
-                if (err.code === 'LIMIT_FILE_SIZE') {
-                    err.message = 'File size is too large. Maximum filesize is 5MB.';
-                }
-                console.log(`Add poster: ${err}`);
-                return res.json({ success: false, message: err });
-            } else if (err) {
-                console.log(`Add poster: ${err}`);
-                return res.json({ success: false, message: err });
+            if (err) {
+                console.log(`Add poster error: ${err.message}`);
+                return res.status(400).json({ success: false, message: err.message });
             }
+
             const { posterName } = req.body;
-            let imageUrl = 'no_url';
+            let imageUrl = null;
+            let publicId = null;
+
+            // Xử lý upload ảnh nếu có file
             if (req.file) {
-                imageUrl = `${process.env.SERVER_URL}/image/poster/${req.file.filename}`
+                imageUrl = req.file.path; // Đường dẫn ảnh từ Cloudinary
+                publicId = req.file.filename; // Public ID để quản lý ảnh
             }
 
             if (!posterName) {
+                // Xóa ảnh đã upload nếu có lỗi
+                if (publicId) {
+                    await cloudinary.uploader.destroy(publicId);
+                }
                 return res.status(400).json({ success: false, message: "Name is required." });
             }
 
             try {
                 const newPoster = new Poster({
                     posterName: posterName,
-                    imageUrl: imageUrl
+                    imageUrl: imageUrl,
+                    publicId: publicId
                 });
                 await newPoster.save();
-                res.json({ success: true, message: "Poster created successfully.", data: null });
+                
+                res.json({ 
+                    success: true, 
+                    message: "Poster created successfully.", 
+                    data: { posterName, imageUrl } 
+                });
             } catch (error) {
+                // Xóa ảnh trên Cloudinary nếu lưu database thất bại
+                if (publicId) {
+                    await cloudinary.uploader.destroy(publicId);
+                }
                 console.error("Error creating Poster:", error);
                 res.status(500).json({ success: false, message: error.message });
             }
-
         });
-
     } catch (err) {
         console.log(`Error creating Poster: ${err.message}`);
         return res.status(500).json({ success: false, message: err.message });
