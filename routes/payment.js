@@ -22,7 +22,7 @@ router.post('/stripe', asyncHandler(async (req, res) => {
 
     const ephemeralKey = await stripe.ephemeralKeys.create(
       { customer: customer.id },
-      { apiVersion: '2023-10-16' }
+      { apiVersion: '2024-11-20.acacia' }
     );
 
     const paymentIntent = await stripe.paymentIntents.create({
